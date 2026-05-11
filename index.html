@@ -431,7 +431,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut as fbSignOut, onAuthStateChanged }
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut as fbSignOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getDatabase, ref, onValue, set, push, remove, update }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -509,7 +509,6 @@ window.doGoogleSignIn = async () => {
     await signInWithPopup(auth, provider);
   } catch(e) {
     if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
-      // Fall back to redirect if popup is blocked
       await signInWithRedirect(auth, provider);
     } else {
       const el = document.getElementById('loginError');
@@ -520,15 +519,6 @@ window.doGoogleSignIn = async () => {
 };
 
 window.doSignOut = () => fbSignOut(auth);
-
-// Handle redirect result on page load
-getRedirectResult(auth).catch(e => {
-  if (e) {
-    const el = document.getElementById('loginError');
-    el.style.display='block';
-    el.textContent='ERROR: '+e.message;
-  }
-});
 
 onAuthStateChanged(auth, user => {
   if (!user) { currentUser=null; currentRole=null; showScreen('login'); return; }
