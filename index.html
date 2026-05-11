@@ -194,6 +194,33 @@
   .add-card-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(245,166,35,0.05); }
   .col-locked { font-family: 'Share Tech Mono', monospace; font-size: 0.6rem; color: var(--text-muted); text-align: center; padding: 6px; border: 1px dashed var(--border); opacity: 0.5; }
 
+  /* Assignee multi-select */
+  .assignee-picker { display: flex; flex-direction: column; gap: 6px; }
+  .assignee-picker-list { display: flex; flex-wrap: wrap; gap: 6px; min-height: 32px; padding: 6px; background: var(--surface2); border: 1px solid var(--border); }
+  .assignee-chip { display: flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; cursor: pointer; transition: opacity 0.1s; border: 1px solid transparent; }
+  .assignee-chip:hover { opacity: 0.75; }
+  .assignee-chip .chip-x { font-size: 0.65rem; opacity: 0.7; }
+  .assignee-dropdown-list { display: flex; flex-wrap: wrap; gap: 5px; }
+  .assignee-option { padding: 4px 10px; background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); font-size: 0.72rem; font-family: 'Barlow', sans-serif; font-weight: 600; cursor: pointer; transition: all 0.12s; border-radius: 2px; }
+  .assignee-option:hover { border-color: var(--accent3); color: var(--accent3); }
+  .assignee-option.selected { border-color: var(--accent3); color: var(--accent3); background: rgba(61,184,165,0.1); }
+  .assignee-required { font-family: 'Share Tech Mono', monospace; font-size: 0.6rem; color: var(--accent2); display: none; margin-top: 3px; }
+
+  /* Online panel */
+  .online-btn { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 5px 10px; font-family: 'Share Tech Mono', monospace; font-size: 0.68rem; letter-spacing: 0.06em; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.15s; }
+  .online-btn:hover { border-color: var(--accent3); color: var(--accent3); }
+  .online-count { background: var(--accent3); color: #0e0f11; border-radius: 10px; padding: 0px 5px; font-size: 0.6rem; font-weight: 700; }
+
+  .online-panel { display: none; position: fixed; top: 70px; right: 28px; width: 240px; background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--accent3); z-index: 90; animation: slideDown 0.15s ease; }
+  .online-panel.open { display: block; }
+  @keyframes slideDown { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+  .online-panel-title { font-family: 'Bebas Neue', sans-serif; font-size: 1rem; letter-spacing: 0.12em; color: var(--accent3); padding: 10px 14px 8px; border-bottom: 1px solid var(--border); }
+  .online-user-row { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--border); }
+  .online-user-row:last-child { border-bottom: none; }
+  .online-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent3); flex-shrink: 0; box-shadow: 0 0 4px var(--accent3); }
+  .online-user-name { font-size: 0.78rem; color: var(--text-bright); font-weight: 600; flex: 1; }
+  .online-user-role { font-family: 'Share Tech Mono', monospace; font-size: 0.58rem; color: var(--text-muted); }
+
   /* Modal */
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
   .modal-overlay.open { display: flex; }
@@ -319,6 +346,9 @@
         <button class="view-btn active" id="btnKanban" onclick="setView('kanban')">⬛ KANBAN</button>
         <button class="view-btn" id="btnCal" onclick="setView('calendar')">📅 CALENDAR</button>
       </div>
+      <button class="online-btn" onclick="toggleOnlinePanel()">
+        <span style="color:var(--accent3)">●</span> ONLINE <span class="online-count" id="onlineCount">0</span>
+      </button>
       <div class="live-badge"><div class="live-dot"></div>LIVE</div>
       <button class="add-task-btn" onclick="openModal()">+ NEW TASK</button>
       <div class="user-pill" id="userPill">
@@ -343,6 +373,7 @@
       <button class="tag-btn" onclick="setFilter('admin',this)">ADMIN</button>
       <button class="tag-btn" onclick="setFilter('urgent',this)">URGENT</button>
     </div>
+    <button class="tag-btn" id="myTasksBtn" onclick="toggleMyTasks(this)" style="border-color:var(--accent4);color:var(--accent4)">👤 MY TASKS</button>
     <input class="search-input" placeholder="SEARCH TASKS..." oninput="filterCards()" id="searchInput">
   </div>
 
@@ -369,6 +400,12 @@
     <button class="day-panel-add" onclick="openModalForDay()">+ ADD TASK FOR THIS DAY</button>
   </div>
 
+  <!-- Online Panel -->
+  <div class="online-panel" id="onlinePanel">
+    <div class="online-panel-title">🟢 ONLINE NOW</div>
+    <div id="onlineList"></div>
+  </div>
+
   <div class="stats-bar">
     <div class="stat-item">TOTAL: <span class="stat-val" id="statTotal">0</span></div>
     <div class="stat-item">BACKLOG: <span class="stat-val" id="statBacklog">0</span></div>
@@ -391,15 +428,22 @@
           <option value="inprogress">In Progress</option><option value="review">Review</option><option value="done">Done</option>
         </select>
       </div>
+      <div class="form-row"><label>Due Date</label><input type="date" id="f-date"></div>
+    </div>
+    <div class="form-row-2">
       <div class="form-row"><label>Priority</label>
         <select id="f-priority">
           <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option>
         </select>
       </div>
     </div>
-    <div class="form-row-2">
-      <div class="form-row"><label>Assignee</label><input type="text" id="f-assignee" placeholder="e.g. AJ, KL" maxlength="3"></div>
-      <div class="form-row"><label>Due Date</label><input type="date" id="f-date"></div>
+    <div class="form-row">
+      <label>Assignees * <span style="color:var(--text-muted);font-size:0.6rem">(required — select at least one)</span></label>
+      <div class="assignee-picker">
+        <div class="assignee-picker-list" id="assigneeSelected"></div>
+        <div class="assignee-dropdown-list" id="assigneeOptions"></div>
+      </div>
+      <div class="assignee-required" id="assigneeRequired">// AT LEAST ONE ASSIGNEE IS REQUIRED</div>
     </div>
     <div class="form-row"><label>Tags</label>
       <div class="tag-picker">
@@ -458,6 +502,7 @@ let tasks = {};
 let allUsers = {};
 let editingId = null;
 let activeFilter = 'all';
+let myTasksOnly = false;
 let currentView = 'kanban';
 let draggedId = null;
 let selectedDayStr = null;
@@ -552,6 +597,7 @@ onAuthStateChanged(auth, user => {
         setupAppUI(user, role);
         listenToTasks();
         listenToUsers();
+        setupPresence(user.uid);
         showScreen('app');
       }
     }
@@ -581,6 +627,35 @@ function listenToTasks() {
 function listenToUsers() {
   onValue(ref(db,'users'), snap => {
     allUsers = snap.val()||{};
+    updateAssigneeOptions();
+  });
+}
+
+// ── PRESENCE ─────────────────────────────────────────────────────────────────
+function setupPresence(uid) {
+  const presenceRef = ref(db, `presence/${uid}`);
+  const connRef = ref(db, '.info/connected');
+  onValue(connRef, snap => {
+    if (snap.val()) {
+      set(presenceRef, { name: currentUser.displayName||currentUser.email, role: currentRole, online: true, lastSeen: Date.now() });
+      // Remove on disconnect
+      import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(({onDisconnect}) => {
+        onDisconnect(presenceRef).remove();
+      });
+    }
+  });
+  onValue(ref(db,'presence'), snap => {
+    const online = snap.val()||{};
+    const entries = Object.entries(online);
+    document.getElementById('onlineCount').textContent = entries.length;
+    document.getElementById('onlineList').innerHTML = entries.length === 0
+      ? '<div style="padding:10px 14px;font-family:\'Share Tech Mono\',monospace;font-size:0.68rem;color:var(--text-muted)">// NO ONE ONLINE</div>'
+      : entries.map(([,u])=>`
+          <div class="online-user-row">
+            <div class="online-dot"></div>
+            <div class="online-user-name">${escHtml(u.name||'Unknown')}</div>
+            <div class="online-user-role">${(u.role||'').toUpperCase()}</div>
+          </div>`).join('');
   });
 }
 
@@ -630,9 +705,9 @@ function getFilteredTasks() {
   const search = (document.getElementById('searchInput')?.value||'').toLowerCase();
   return Object.entries(tasks).map(([id,t])=>({...t,_id:id})).filter(t=>{
     if (activeFilter!=='all' && !(t.tags||[]).includes(activeFilter)) return false;
+    if (myTasksOnly && currentUser && !(t.assignees||[]).includes(currentUser.uid)) return false;
     if (search && !t.title?.toLowerCase().includes(search) &&
-        !(t.desc||'').toLowerCase().includes(search) &&
-        !(t.assignee||'').toLowerCase().includes(search)) return false;
+        !(t.desc||'').toLowerCase().includes(search)) return false;
     return true;
   });
 }
@@ -675,7 +750,6 @@ window.render = () => {
 
 function cardHTML(t) {
   const pColor = PRIORITY_COLORS[t.priority]||'#6b7280';
-  const aColor = ASSIGNEE_COLORS[(t.assignee||'').charCodeAt(0)%ASSIGNEE_COLORS.length];
   const tagsHTML = (t.tags||[]).map(tag=>{
     const c=TAG_COLORS[tag]||{bg:'#222',color:'#888'};
     return `<span class="tag" style="background:${c.bg};color:${c.color}">${tag}</span>`;
@@ -687,8 +761,13 @@ function cardHTML(t) {
     const cls=diff<0?'overdue':diff<=3?'soon':'';
     dateStr=`<span class="card-date ${cls}" title="${t.date}">📅 ${t.date.slice(5)}</span>`;
   }
-  const assigneeHTML = t.assignee
-    ? `<div class="assignee" style="background:${aColor}">${t.assignee.substring(0,2).toUpperCase()}</div>` : '';
+  const assigneesHTML = (t.assignees||[]).map(uid=>{
+    const u=allUsers[uid];
+    const name = u?(u.name||u.email):'?';
+    const initials = name.substring(0,2).toUpperCase();
+    const bg = getAssigneeBg(uid);
+    return `<div class="assignee" style="background:${bg}" title="${escHtml(name)}">${initials}</div>`;
+  }).join('');
   const editBtn  = canEdit()  ? `<button class="card-btn" onclick="openEditModal('${t._id}')">EDIT</button>` : '';
   const delBtn   = canDelete()? `<button class="card-btn del" onclick="doDeleteTask('${t._id}')">DEL</button>` : '';
   const actions  = (editBtn||delBtn) ? `<div class="card-actions">${editBtn}${delBtn}</div>` : '';
@@ -701,22 +780,82 @@ function cardHTML(t) {
       ${t.desc?`<div class="card-desc">${escHtml(t.desc)}</div>`:''}
       <div class="card-footer">
         <div class="card-tags">${tagsHTML}</div>
-        <div class="card-meta">${dateStr}<div class="priority-dot" style="background:${pColor}" title="${t.priority}"></div>${assigneeHTML}</div>
+        <div class="card-meta">${dateStr}<div class="priority-dot" style="background:${pColor}" title="${t.priority}"></div>${assigneesHTML}</div>
       </div>
     </div>`;
 }
 
+// ── ASSIGNEE PICKER ───────────────────────────────────────────────────────────
+const ASSIGNEE_BG_COLORS = ['#f5a623','#3db8a5','#7b5ea7','#e84c3d','#4caf7d','#5ba3f5'];
+let selectedAssignees = []; // array of uids
+
+function getAssigneeBg(uid) {
+  const keys = Object.keys(allUsers);
+  const idx = keys.indexOf(uid) % ASSIGNEE_BG_COLORS.length;
+  return ASSIGNEE_BG_COLORS[Math.max(0,idx)];
+}
+
+function updateAssigneeOptions() {
+  const container = document.getElementById('assigneeOptions');
+  if (!container) return;
+  const approved = Object.entries(allUsers).filter(([,u])=>u.role!=='pending');
+  container.innerHTML = approved.map(([uid,u])=>{
+    const bg = getAssigneeBg(uid);
+    const isSel = selectedAssignees.includes(uid);
+    return `<div class="assignee-option ${isSel?'selected':''}" data-uid="${uid}" onclick="toggleAssignee('${uid}')">${escHtml(u.name||u.email)}</div>`;
+  }).join('');
+  renderAssigneeChips();
+}
+
+function renderAssigneeChips() {
+  const container = document.getElementById('assigneeSelected');
+  if (!container) return;
+  if (selectedAssignees.length === 0) {
+    container.innerHTML = '<span style="font-family:\'Share Tech Mono\',monospace;font-size:0.65rem;color:var(--text-muted)">// CLICK NAMES BELOW TO ASSIGN</span>';
+    return;
+  }
+  container.innerHTML = selectedAssignees.map(uid => {
+    const u = allUsers[uid];
+    const bg = getAssigneeBg(uid);
+    const name = u ? (u.name||u.email).split(' ')[0] : uid;
+    return `<span class="assignee-chip" style="background:${bg}22;color:${bg};border-color:${bg}" onclick="toggleAssignee('${uid}')">${escHtml(name)} <span class="chip-x">✕</span></span>`;
+  }).join('');
+}
+
+window.toggleAssignee = (uid) => {
+  if (selectedAssignees.includes(uid)) {
+    selectedAssignees = selectedAssignees.filter(a=>a!==uid);
+  } else {
+    selectedAssignees.push(uid);
+  }
+  document.getElementById('assigneeRequired').style.display='none';
+  updateAssigneeOptions();
+};
+
+// ── ONLINE PANEL ──────────────────────────────────────────────────────────────
+window.toggleOnlinePanel = () => {
+  document.getElementById('onlinePanel').classList.toggle('open');
+};
+document.addEventListener('click', e => {
+  const panel = document.getElementById('onlinePanel');
+  if (panel && !panel.contains(e.target) && !e.target.closest('.online-btn')) {
+    panel.classList.remove('open');
+  }
+});
+
 // ── MODAL ─────────────────────────────────────────────────────────────────────
 window.openModal = (defaultCol) => {
   editingId=null;
+  selectedAssignees=[];
   document.getElementById('modalTitleText').textContent='NEW TASK';
   document.getElementById('f-title').value='';
   document.getElementById('f-desc').value='';
   document.getElementById('f-col').value=defaultCol||'backlog';
   document.getElementById('f-priority').value='medium';
-  document.getElementById('f-assignee').value='';
   document.getElementById('f-date').value='';
   document.querySelectorAll('.tag-option').forEach(el=>el.classList.remove('selected'));
+  document.getElementById('assigneeRequired').style.display='none';
+  updateAssigneeOptions();
   document.getElementById('modalOverlay').classList.add('open');
   setTimeout(()=>document.getElementById('f-title').focus(),100);
 };
@@ -725,27 +864,33 @@ window.openEditModal = (id) => {
   if (!canEdit()) return;
   const t=tasks[id]; if(!t) return;
   editingId=id;
+  selectedAssignees = t.assignees||[];
   document.getElementById('modalTitleText').textContent='EDIT TASK';
   document.getElementById('f-title').value=t.title||'';
   document.getElementById('f-desc').value=t.desc||'';
   document.getElementById('f-col').value=t.col||'backlog';
   document.getElementById('f-priority').value=t.priority||'medium';
-  document.getElementById('f-assignee').value=t.assignee||'';
   document.getElementById('f-date').value=t.date||'';
   document.querySelectorAll('.tag-option').forEach(el=>el.classList.toggle('selected',(t.tags||[]).includes(el.dataset.tag)));
+  document.getElementById('assigneeRequired').style.display='none';
+  updateAssigneeOptions();
   document.getElementById('modalOverlay').classList.add('open');
 };
 
 window.saveTask = async () => {
   const title=document.getElementById('f-title').value.trim();
   if (!title) { document.getElementById('f-title').focus(); return; }
+  if (selectedAssignees.length === 0) {
+    document.getElementById('assigneeRequired').style.display='block';
+    return;
+  }
   const tags=[...document.querySelectorAll('.tag-option.selected')].map(el=>el.dataset.tag);
   const data={
     title, tags,
     desc:document.getElementById('f-desc').value.trim(),
     col:document.getElementById('f-col').value,
     priority:document.getElementById('f-priority').value,
-    assignee:document.getElementById('f-assignee').value.trim(),
+    assignees: selectedAssignees,
     date:document.getElementById('f-date').value,
     updatedAt:Date.now(), updatedBy:currentUser.uid
   };
@@ -831,6 +976,14 @@ window.removeUser = async (uid) => {
 };
 
 // ── FILTERS ───────────────────────────────────────────────────────────────────
+window.toggleMyTasks = (btn) => {
+  myTasksOnly = !myTasksOnly;
+  btn.style.background = myTasksOnly ? 'rgba(123,94,167,0.2)' : 'transparent';
+  btn.style.borderColor = 'var(--accent4)';
+  btn.style.color = 'var(--accent4)';
+  if(currentView==='calendar') renderCalendar(); else render();
+};
+
 window.setFilter = (tag,btn)=>{
   activeFilter=tag;
   document.querySelectorAll('.tag-btn').forEach(b=>b.classList.remove('active'));
