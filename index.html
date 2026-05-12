@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -615,13 +615,38 @@ function setupAppUI(user, role) {
   document.getElementById('adminPanelBtn').style.display = role==='admin'?'block':'none';
 }
 
+// ── API ───────────────────────────────────────────────────────────────────────
+const API = 'https://yj-api.albt.qzz.io';
+
+async function apiFetch(path, options={}) {
+  const r = await fetch(API + path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(()=>({}));
+    throw new Error(err.detail || `API error ${r.status}`);
+  }
+  return r.json();
+}
+
 // ── FIREBASE LISTENERS ───────────────────────────────────────────────────────
 function listenToTasks() {
-  onValue(ref(db,'tasks'), snap => {
-    tasks = snap.val()||{};
-    render();
-    if (currentView==='calendar') renderCalendar();
-  });
+  // Poll API every 5 seconds for live updates
+  async function fetchTasks() {
+    try {
+      const data = await apiFetch('/api/tasks');
+      // Convert array to id-keyed object to match existing render logic
+      tasks = {};
+      (data.tasks||[]).forEach(t => { tasks[t.id] = t; });
+      render();
+      if (currentView==='calendar') renderCalendar();
+    } catch(e) {
+      console.error('Failed to fetch tasks:', e);
+    }
+  }
+  fetchTasks();
+  setInterval(fetchTasks, 5000);
 }
 
 function listenToUsers() {
@@ -696,8 +721,12 @@ window.drop = async (e, colId) => {
     showToast('ACCESS DENIED — ONLY ADMINS CAN MOVE TO '+colId.toUpperCase(), true);
     return;
   }
-  await update(ref(db,`tasks/${draggedId}`), { col:colId, updatedAt:Date.now(), updatedBy:currentUser.uid });
-  showToast('MOVED TO '+colId.toUpperCase());
+  try {
+    await apiFetch(`/api/tasks/${draggedId}`, { method:'PUT', body:JSON.stringify({ col:colId }) });
+    showToast('MOVED TO '+colId.toUpperCase());
+  } catch(e) {
+    showToast('ERROR: ' + e.message, true);
+  }
 };
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
@@ -892,24 +921,31 @@ window.saveTask = async () => {
     priority:document.getElementById('f-priority').value,
     assignees: selectedAssignees,
     date:document.getElementById('f-date').value,
-    updatedAt:Date.now(), updatedBy:currentUser.uid
+    createdBy: currentUser.uid
   };
-  if (editingId) {
-    await update(ref(db,`tasks/${editingId}`),data);
-    showToast('TASK UPDATED');
-  } else {
-    data.createdAt=Date.now(); data.createdBy=currentUser.uid;
-    await push(ref(db,'tasks'),data);
-    showToast('TASK CREATED');
+  try {
+    if (editingId) {
+      await apiFetch(`/api/tasks/${editingId}`, { method:'PUT', body:JSON.stringify(data) });
+      showToast('TASK UPDATED');
+    } else {
+      await apiFetch('/api/tasks', { method:'POST', body:JSON.stringify(data) });
+      showToast('TASK CREATED');
+    }
+    closeModal();
+  } catch(e) {
+    showToast('ERROR: ' + e.message, true);
   }
-  closeModal();
 };
 
 window.doDeleteTask = async (id) => {
   if (!canDelete()) return;
   if (!confirm('Delete this task?')) return;
-  await remove(ref(db,`tasks/${id}`));
-  showToast('TASK DELETED');
+  try {
+    await apiFetch(`/api/tasks/${id}`, { method:'DELETE' });
+    showToast('TASK DELETED');
+  } catch(e) {
+    showToast('ERROR: ' + e.message, true);
+  }
 };
 
 window.closeModal = ()=>document.getElementById('modalOverlay').classList.remove('open');
