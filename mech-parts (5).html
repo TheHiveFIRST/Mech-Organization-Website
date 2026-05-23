@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MECH OPS — Parts Inventory</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Barlow:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0e0f11;
+    --surface: #161719;
+    --surface2: #1d1f22;
+    --border: #2e3035;
+    --accent: #f5a623;
+    --accent2: #e84c3d;
+    --accent3: #3db8a5;
+    --accent4: #7b5ea7;
+    --text: #d4d6db;
+    --text-muted: #6b7280;
+    --text-bright: #f0f2f5;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(245,166,35,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(245,166,35,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── LOADING ── */
+  #loadingScreen {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; background: var(--bg);
+  }
+  .loading-text {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.8rem; color: var(--accent);
+    letter-spacing: 0.2em; animation: blink 1s infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── LOGIN SCREEN ── */
+  #loginScreen {
+    position: fixed; inset: 0;
+    display: none; align-items: center; justify-content: center;
+    z-index: 1000; background: var(--bg);
+  }
+  .login-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 3px solid var(--accent);
+    padding: 48px 40px; width: 100%; max-width: 400px; text-align: center;
+  }
+  .login-logo { font-family: 'Bebas Neue', sans-serif; font-size: 3rem; letter-spacing: 0.15em; color: var(--accent); margin-bottom: 4px; }
+  .login-sub { font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; color: var(--text-muted); letter-spacing: 0.2em; margin-bottom: 40px; }
+  .login-btn {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    width: 100%; padding: 13px 20px;
+    background: #fff; color: #333; border: none; cursor: pointer;
+    font-family: 'Barlow', sans-serif; font-size: 0.95rem; font-weight: 600;
+    transition: background 0.15s, transform 0.1s; border-radius: 2px;
+  }
+  .login-btn:hover { background: #f0f0f0; transform: scale(1.02); }
+  .login-btn svg { width:20px; height:20px; flex-shrink:0; }
+  #loginError { display:none; margin-top:14px; font-family:'Share Tech Mono',monospace; font-size:0.7rem; color:var(--accent2); }
+
+  /* ── PENDING SCREEN ── */
+  #pendingScreen {
+    position: fixed; inset: 0;
+    display: none; align-items: center; justify-content: center;
+    z-index: 1000; background: var(--bg);
+  }
+  .pending-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-top: 3px solid var(--accent4); padding: 48px 40px;
+    width: 100%; max-width: 420px; text-align: center;
+  }
+  .pending-icon { font-size: 2.5rem; margin-bottom: 16px; }
+  .pending-title { font-family:'Bebas Neue',sans-serif; font-size:2rem; color:var(--accent4); letter-spacing:0.1em; margin-bottom:8px; }
+  .pending-desc { font-size:0.88rem; color:var(--text-muted); line-height:1.6; margin-bottom:20px; }
+  .pending-email { font-family:'Share Tech Mono',monospace; font-size:0.75rem; color:var(--accent); }
+  .signout-link { margin-top:24px; font-family:'Share Tech Mono',monospace; font-size:0.68rem; color:var(--text-muted); cursor:pointer; text-decoration:underline; }
+  .signout-link:hover { color:var(--text); }
+
+  /* ── APP SHELL ── */
+  #app { display: none; position: relative; z-index: 1; }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 24px; height: 56px;
+  }
+  .topbar-logo { font-family:'Bebas Neue',sans-serif; font-size:1.5rem; letter-spacing:0.15em; color:var(--accent); flex-shrink:0; }
+  .topbar-sep { width:1px; height:24px; background:var(--border); flex-shrink:0; }
+  .topbar-page { font-family:'Share Tech Mono',monospace; font-size:0.68rem; color:var(--text-muted); letter-spacing:0.15em; flex-shrink:0; }
+  .topbar-spacer { flex:1; }
+
+  /* search in topbar */
+  .topbar-search {
+    position: relative; display:flex; align-items:center;
+  }
+  .topbar-search input {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-family:'Share Tech Mono',monospace; font-size:0.72rem;
+    padding: 6px 12px 6px 32px; width: 220px; outline: none;
+    letter-spacing: 0.05em; transition: border-color 0.15s;
+  }
+  .topbar-search input:focus { border-color: var(--accent); }
+  .topbar-search input::placeholder { color: var(--text-muted); }
+  .search-icon { position:absolute; left:10px; color:var(--text-muted); font-size:0.8rem; pointer-events:none; }
+
+  /* filter chips */
+  .filter-bar { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  .filter-chip {
+    font-family:'Share Tech Mono',monospace; font-size:0.62rem; letter-spacing:0.1em;
+    padding: 4px 10px; border: 1px solid var(--border); background:transparent;
+    color: var(--text-muted); cursor:pointer; transition: all 0.15s;
+  }
+  .filter-chip:hover { border-color:var(--accent); color:var(--accent); }
+  .filter-chip.active { background:var(--accent); border-color:var(--accent); color:#000; font-weight:700; }
+
+  /* user area */
+  .user-area { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  .user-avatar {
+    width:30px; height:30px; border-radius:2px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Bebas Neue',sans-serif; font-size:0.85rem;
+    background:var(--accent); color:#000; flex-shrink:0;
+  }
+  .user-info { display:flex; flex-direction:column; }
+  .user-name { font-size:0.78rem; font-weight:600; color:var(--text-bright); line-height:1.2; }
+  .user-role-badge {
+    font-family:'Share Tech Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.12em; padding:1px 5px; display:inline-block;
+  }
+  .role-admin   { background:rgba(245,166,35,0.15); color:var(--accent); }
+  .role-member  { background:rgba(61,184,165,0.15); color:var(--accent3); }
+  .topbar-signout {
+    font-family:'Share Tech Mono',monospace; font-size:0.62rem; color:var(--text-muted);
+    background:none; border:1px solid var(--border); padding:5px 10px; cursor:pointer;
+    transition:all 0.15s; letter-spacing:0.1em;
+  }
+  .topbar-signout:hover { border-color:var(--accent2); color:var(--accent2); }
+
+  /* ── MAIN CONTENT ── */
+  .main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+
+  /* ── STATS BAR ── */
+  .stats-bar {
+    display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 14px 20px; flex: 1; min-width: 120px;
+    display: flex; flex-direction:column; gap:4px;
+  }
+  .stat-label { font-family:'Share Tech Mono',monospace; font-size:0.6rem; color:var(--text-muted); letter-spacing:0.15em; }
+  .stat-val { font-family:'Bebas Neue',sans-serif; font-size:1.8rem; color:var(--text-bright); line-height:1; }
+  .stat-val.accent { color:var(--accent); }
+  .stat-val.teal   { color:var(--accent3); }
+  .stat-val.purple { color:var(--accent4); }
+  .stat-val.red    { color:var(--accent2); }
+
+  /* ── TOOLBAR ── */
+  .toolbar {
+    display: flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;
+  }
+  .toolbar-title {
+    font-family:'Bebas Neue',sans-serif; font-size:1.4rem; letter-spacing:0.1em; color:var(--text-bright);
+  }
+  .toolbar-count {
+    font-family:'Share Tech Mono',monospace; font-size:0.65rem; color:var(--text-muted);
+    background:var(--surface2); border:1px solid var(--border); padding:3px 8px;
+  }
+  .toolbar-spacer { flex:1; }
+  .btn-add {
+    font-family:'Share Tech Mono',monospace; font-size:0.7rem; letter-spacing:0.12em;
+    padding:8px 18px; background:var(--accent); color:#000; border:none; cursor:pointer;
+    font-weight:700; transition:all 0.15s;
+  }
+  .btn-add:hover { background:#e09010; }
+  .btn-admin {
+    font-family:'Share Tech Mono',monospace; font-size:0.7rem; letter-spacing:0.12em;
+    padding:8px 14px; background:transparent; color:var(--text-muted);
+    border:1px solid var(--border); cursor:pointer; transition:all 0.15s;
+  }
+  .btn-admin:hover { border-color:var(--accent4); color:var(--accent4); }
+
+  /* ── PARTS TABLE ── */
+  .table-wrap {
+    background: var(--surface); border: 1px solid var(--border); overflow-x:auto;
+  }
+  table { width:100%; border-collapse:collapse; }
+  thead tr {
+    border-bottom: 2px solid var(--border);
+    background: var(--surface2);
+  }
+  th {
+    font-family:'Share Tech Mono',monospace; font-size:0.62rem; letter-spacing:0.15em;
+    color:var(--text-muted); padding:10px 16px; text-align:left; white-space:nowrap;
+    user-select:none; cursor:pointer;
+  }
+  th:hover { color:var(--accent); }
+  th.sort-asc::after  { content:' ▲'; color:var(--accent); }
+  th.sort-desc::after { content:' ▼'; color:var(--accent); }
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  tbody tr:hover { background: var(--surface2); }
+  td { padding:10px 16px; font-size:0.85rem; vertical-align:middle; }
+
+  .part-name { font-weight:600; color:var(--text-bright); }
+  .part-sku  { font-family:'Share Tech Mono',monospace; font-size:0.7rem; color:var(--text-muted); margin-top:2px; }
+
+  .qty-badge {
+    font-family:'Share Tech Mono',monospace; font-size:0.75rem; font-weight:700;
+    padding:3px 10px; display:inline-block;
+  }
+  .qty-good { background:rgba(76,175,125,0.15); color:#4caf7d; }
+  .qty-zero { background:rgba(232,76,61,0.15);  color:var(--accent2); }
+
+  .cat-tag {
+    font-family:'Share Tech Mono',monospace; font-size:0.6rem; letter-spacing:0.08em;
+    padding:2px 8px; border:1px solid; display:inline-block;
+  }
+
+  .row-actions { display:flex; gap:6px; justify-content:flex-end; }
+  .row-btn {
+    font-family:'Share Tech Mono',monospace; font-size:0.6rem; letter-spacing:0.1em;
+    padding:4px 10px; border:1px solid var(--border); background:transparent;
+    color:var(--text-muted); cursor:pointer; transition:all 0.15s;
+  }
+  .row-btn:hover       { border-color:var(--accent); color:var(--accent); }
+  .row-btn.del:hover   { border-color:var(--accent2); color:var(--accent2); }
+  .row-btn.adj:hover   { border-color:var(--accent3); color:var(--accent3); }
+
+  .empty-state {
+    padding: 60px 20px; text-align:center;
+    font-family:'Share Tech Mono',monospace; font-size:0.75rem; color:var(--text-muted);
+    letter-spacing:0.1em;
+  }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,0.7);
+    display:none; align-items:center; justify-content:center; z-index:200;
+  }
+  .modal-overlay.open { display:flex; }
+  .modal {
+    background:var(--surface); border:1px solid var(--border);
+    border-top:3px solid var(--accent); width:100%; max-width:480px;
+    max-height:90vh; overflow-y:auto; padding:32px;
+    animation: slideUp 0.2s ease;
+  }
+  @keyframes slideUp { from{transform:translateY(16px);opacity:0} to{transform:none;opacity:1} }
+  .modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
+  .modal-title  { font-family:'Bebas Neue',sans-serif; font-size:1.6rem; letter-spacing:0.1em; color:var(--accent); }
+  .modal-close  { background:none; border:none; color:var(--text-muted); font-size:1.2rem; cursor:pointer; padding:4px 8px; }
+  .modal-close:hover { color:var(--text); }
+
+  .form-row { display:flex; gap:12px; }
+  .form-group { display:flex; flex-direction:column; gap:6px; margin-bottom:16px; flex:1; }
+  .form-label { font-family:'Share Tech Mono',monospace; font-size:0.62rem; letter-spacing:0.12em; color:var(--text-muted); }
+  .form-input, .form-select, .form-textarea {
+    background:var(--surface2); border:1px solid var(--border);
+    color:var(--text); font-family:'Barlow',sans-serif; font-size:0.88rem;
+    padding:8px 12px; outline:none; width:100%;
+    transition:border-color 0.15s;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color:var(--accent); }
+  .form-select option { background:var(--surface2); }
+  .form-textarea { min-height:72px; resize:vertical; }
+
+  .modal-footer { display:flex; gap:10px; justify-content:flex-end; margin-top:8px; }
+  .btn-save {
+    font-family:'Share Tech Mono',monospace; font-size:0.7rem; letter-spacing:0.12em;
+    padding:9px 22px; background:var(--accent); color:#000; border:none; cursor:pointer;
+    font-weight:700; transition:background 0.15s;
+  }
+  .btn-save:hover { background:#e09010; }
+  .btn-cancel {
+    font-family:'Share Tech Mono',monospace; font-size:0.7rem; letter-spacing:0.12em;
+    padding:9px 16px; background:transparent; color:var(--text-muted);
+    border:1px solid var(--border); cursor:pointer; transition:all 0.15s;
+  }
+  .btn-cancel:hover { border-color:var(--accent2); color:var(--accent2); }
+
+  /* ── ADJUST QTY MODAL ── */
+  .adj-modal {
+    border-top-color: var(--accent3);
+  }
+  .adj-display {
+    font-family:'Bebas Neue',sans-serif; font-size:4rem; color:var(--text-bright);
+    text-align:center; padding:24px 0 8px; line-height:1;
+  }
+  .adj-controls { display:flex; align-items:center; gap:12px; justify-content:center; margin-bottom:8px; }
+  .adj-btn {
+    width:44px; height:44px; font-size:1.4rem; font-weight:700;
+    background:var(--surface2); border:1px solid var(--border);
+    color:var(--text); cursor:pointer; transition:all 0.15s;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .adj-btn:hover { border-color:var(--accent3); color:var(--accent3); }
+  .adj-input {
+    width:80px; text-align:center;
+    background:var(--surface2); border:1px solid var(--accent3);
+    color:var(--accent3); font-family:'Share Tech Mono',monospace;
+    font-size:1.1rem; padding:8px; outline:none;
+  }
+  .adj-part-name {
+    font-family:'Share Tech Mono',monospace; font-size:0.68rem; color:var(--text-muted);
+    text-align:center; letter-spacing:0.1em; margin-bottom:4px;
+  }
+
+  /* ── ADMIN PANEL ── */
+  .admin-overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,0.7);
+    display:none; align-items:center; justify-content:center; z-index:200;
+  }
+  .admin-overlay.open { display:flex; }
+  .admin-panel {
+    background:var(--surface); border:1px solid var(--border);
+    border-top:3px solid var(--accent4); width:100%; max-width:520px;
+    max-height:90vh; overflow-y:auto; padding:32px;
+    animation: slideUp 0.2s ease;
+  }
+  .admin-title { font-family:'Bebas Neue',sans-serif; font-size:1.6rem; letter-spacing:0.1em; color:var(--accent4); margin-bottom:20px; }
+  .admin-section-title { font-family:'Share Tech Mono',monospace; font-size:0.62rem; letter-spacing:0.15em; color:var(--text-muted); margin-bottom:10px; }
+  .user-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border); gap:8px; }
+  .user-row-name { font-weight:600; font-size:0.88rem; color:var(--text-bright); }
+  .user-row-email { font-family:'Share Tech Mono',monospace; font-size:0.65rem; color:var(--text-muted); }
+  .user-row-actions { display:flex; gap:6px; align-items:center; flex-shrink:0; }
+  .approve-btn {
+    font-family:'Share Tech Mono',monospace; font-size:0.6rem; letter-spacing:0.08em;
+    padding:4px 10px; background:rgba(76,175,125,0.15); color:#4caf7d;
+    border:1px solid #4caf7d; cursor:pointer; transition:all 0.15s;
+  }
+  .approve-btn.admin-approve { background:rgba(245,166,35,0.1); color:var(--accent); border-color:var(--accent); }
+  .approve-btn:hover { opacity:0.8; }
+  .role-select {
+    background:var(--surface2); border:1px solid var(--border); color:var(--text);
+    font-family:'Share Tech Mono',monospace; font-size:0.62rem; padding:4px 8px; cursor:pointer;
+  }
+  .remove-user-btn {
+    font-family:'Share Tech Mono',monospace; font-size:0.6rem; padding:4px 8px;
+    background:transparent; border:1px solid var(--border); color:var(--text-muted); cursor:pointer;
+  }
+  .remove-user-btn:hover { border-color:var(--accent2); color:var(--accent2); }
+
+  /* ── TOAST ── */
+  .toast {
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:var(--surface2); border:1px solid var(--accent3); border-left:3px solid var(--accent3);
+    color:var(--accent3); font-family:'Share Tech Mono',monospace; font-size:0.72rem;
+    padding:10px 20px; z-index:999; letter-spacing:0.1em;
+    animation: fadeIn 0.2s ease;
+  }
+  .toast.err { border-color:var(--accent2); color:var(--accent2); }
+  @keyframes fadeIn { from{opacity:0;transform:translateX(-50%) translateY(8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+
+  /* ── NAV LINK ── */
+  .nav-link {
+    font-family:'Share Tech Mono',monospace; font-size:0.65rem; letter-spacing:0.12em;
+    color:var(--text-muted); text-decoration:none; padding:6px 12px;
+    border:1px solid var(--border); transition:all 0.15s;
+  }
+  .nav-link:hover { border-color:var(--accent); color:var(--accent); }
+
+  /* category tag colors */
+  .cat-drivetrain { color:#f5a623; border-color:rgba(245,166,35,0.4); background:rgba(245,166,35,0.08); }
+  .cat-intake     { color:#3db8a5; border-color:rgba(61,184,165,0.4); background:rgba(61,184,165,0.08); }
+  .cat-shooter    { color:#e84c3d; border-color:rgba(232,76,61,0.4);  background:rgba(232,76,61,0.08); }
+  .cat-electronics{ color:#7b5ea7; border-color:rgba(123,94,167,0.4); background:rgba(123,94,167,0.08); }
+  .cat-fasteners  { color:#6b7280; border-color:rgba(107,114,128,0.4);background:rgba(107,114,128,0.08); }
+  .cat-structure  { color:#5ba3f5; border-color:rgba(91,163,245,0.4); background:rgba(91,163,245,0.08); }
+  .cat-other      { color:#4caf7d; border-color:rgba(76,175,125,0.4); background:rgba(76,175,125,0.08); }
+
+  @media (max-width:700px) {
+    .topbar { padding:0 12px; gap:8px; }
+    .topbar-search input { width:140px; }
+    .filter-bar { display:none; }
+    .main { padding:12px; }
+    td:nth-child(3), th:nth-child(3) { display:none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loadingScreen">
+  <div class="loading-text">INITIALIZING PARTS INVENTORY...</div>
+</div>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">MECH OPS</div>
+    <div class="login-sub">// PARTS INVENTORY SYSTEM</div>
+    <button class="login-btn" onclick="doGoogleSignIn()">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+      SIGN IN WITH GOOGLE
+    </button>
+    <div id="loginError">// SIGN-IN FAILED — TRY AGAIN</div>
+  </div>
+</div>
+
+<!-- PENDING -->
+<div id="pendingScreen">
+  <div class="pending-box">
+    <div class="pending-icon">⏳</div>
+    <div class="pending-title">AWAITING APPROVAL</div>
+    <div class="pending-desc">Your account is pending admin approval. You'll gain access once an admin approves you.</div>
+    <div class="pending-email" id="pendingEmail"></div>
+    <div class="signout-link" onclick="doSignOut()">SIGN OUT</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-logo">MECH OPS</div>
+    <div class="topbar-sep"></div>
+    <div class="topbar-page">PARTS INVENTORY</div>
+    <div class="topbar-sep"></div>
+    <a href="mech-kanban.html" class="nav-link">⟵ KANBAN</a>
+    <div class="topbar-spacer"></div>
+
+    <!-- search -->
+    <div class="topbar-search">
+      <span class="search-icon">⌕</span>
+      <input type="text" id="searchInput" placeholder="SEARCH PARTS..." oninput="renderParts()">
+    </div>
+
+    <!-- category filter -->
+    <div class="filter-bar" id="filterBar">
+      <button class="filter-chip active" data-cat="all"         onclick="setFilter('all')">ALL</button>
+      <button class="filter-chip"        data-cat="drivetrain"  onclick="setFilter('drivetrain')">DRIVETRAIN</button>
+      <button class="filter-chip"        data-cat="intake"      onclick="setFilter('intake')">INTAKE</button>
+      <button class="filter-chip"        data-cat="shooter"     onclick="setFilter('shooter')">SHOOTER</button>
+      <button class="filter-chip"        data-cat="electronics" onclick="setFilter('electronics')">ELECTRONICS</button>
+      <button class="filter-chip"        data-cat="fasteners"   onclick="setFilter('fasteners')">FASTENERS</button>
+      <button class="filter-chip"        data-cat="structure"   onclick="setFilter('structure')">STRUCTURE</button>
+      <button class="filter-chip"        data-cat="other"       onclick="setFilter('other')">OTHER</button>
+    </div>
+
+    <div class="topbar-sep"></div>
+
+    <!-- user -->
+    <div class="user-area">
+      <div class="user-avatar" id="userInitials">??</div>
+      <div class="user-info">
+        <div class="user-name" id="userName"></div>
+        <span class="user-role-badge" id="userRoleBadge"></span>
+      </div>
+      <button class="topbar-signout" onclick="doSignOut()">SIGN OUT</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- STATS -->
+    <div class="stats-bar">
+      <div class="stat-card">
+        <div class="stat-label">// TOTAL PARTS</div>
+        <div class="stat-val accent" id="statTotal">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">// IN STOCK</div>
+        <div class="stat-val teal" id="statInStock">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">// OUT OF STOCK</div>
+        <div class="stat-val red" id="statOutStock">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">// TOTAL UNITS</div>
+        <div class="stat-val" id="statUnits">0</div>
+      </div>
+    </div>
+
+    <!-- TOOLBAR -->
+    <div class="toolbar">
+      <div class="toolbar-title">PARTS LIST</div>
+      <div class="toolbar-count" id="partsCount">0 PARTS</div>
+      <div class="toolbar-spacer"></div>
+      <button class="btn-admin" id="adminPanelBtn" onclick="openAdminPanel()" style="display:none">MANAGE USERS</button>
+      <button class="btn-add" id="addPartBtn" onclick="openModal()" style="display:none">+ ADD PART</button>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortBy('name')">PART NAME</th>
+            <th onclick="sortBy('sku')">SKU / PART #</th>
+            <th onclick="sortBy('category')">CATEGORY</th>
+            <th onclick="sortBy('quantity')">QTY</th>
+            <th>ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody id="partsBody">
+          <tr><td colspan="5" class="empty-state">// LOADING PARTS...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ADD / EDIT PART MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitleText">NEW PART</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">// PART NAME *</label>
+      <input class="form-input" id="f-name" type="text" placeholder="e.g. NEO 550 Motor" autocomplete="off">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">// SKU / PART #</label>
+        <input class="form-input" id="f-sku" type="text" placeholder="e.g. REV-21-1651">
+      </div>
+      <div class="form-group">
+        <label class="form-label">// QUANTITY *</label>
+        <input class="form-input" id="f-qty" type="number" min="0" placeholder="0">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">// CATEGORY</label>
+      <select class="form-select" id="f-category">
+        <option value="drivetrain">DRIVETRAIN</option>
+        <option value="intake">INTAKE</option>
+        <option value="shooter">SHOOTER</option>
+        <option value="electronics">ELECTRONICS</option>
+        <option value="fasteners">FASTENERS</option>
+        <option value="structure">STRUCTURE</option>
+        <option value="other" selected>OTHER</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">// NOTES (OPTIONAL)</label>
+      <textarea class="form-textarea" id="f-notes" placeholder="Location, specs, supplier info..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal()">CANCEL</button>
+      <button class="btn-save" onclick="savePart()">SAVE PART</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADJUST QTY MODAL -->
+<div class="modal-overlay" id="adjOverlay" onclick="closeAdjOutside(event)">
+  <div class="modal adj-modal">
+    <div class="modal-header">
+      <div class="modal-title" style="color:var(--accent3)">ADJUST QTY</div>
+      <button class="modal-close" onclick="closeAdj()">✕</button>
+    </div>
+    <div class="adj-part-name" id="adjPartName"></div>
+    <div class="adj-display" id="adjDisplay">0</div>
+    <div class="adj-controls">
+      <button class="adj-btn" onclick="adjDelta(-10)">−10</button>
+      <button class="adj-btn" onclick="adjDelta(-1)">−1</button>
+      <input class="adj-input" id="adjInput" type="number" min="0" value="0" oninput="adjFromInput()">
+      <button class="adj-btn" onclick="adjDelta(1)">+1</button>
+      <button class="adj-btn" onclick="adjDelta(10)">+10</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeAdj()">CANCEL</button>
+      <button class="btn-save" style="background:var(--accent3)" onclick="saveAdj()">CONFIRM</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN PANEL -->
+<div class="admin-overlay" id="adminOverlay" onclick="closeAdminOutside(event)">
+  <div class="admin-panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div class="admin-title">MANAGE USERS</div>
+      <button class="modal-close" onclick="closeAdminPanel()">✕</button>
+    </div>
+    <div class="admin-section-title">// PENDING APPROVAL</div>
+    <div id="pendingList" style="margin-bottom:24px"></div>
+    <div class="admin-section-title">// APPROVED MEMBERS</div>
+    <div id="approvedList"></div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp }       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut as fbSignOut, onAuthStateChanged }
+                               from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getDatabase, ref, onValue, set, update, remove }
+                               from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+// ── FIREBASE ─────────────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyAdgPnc0cNWbTWEpFZ95U7HDEPfWazrfEw",
+  authDomain: "organization-app-2cdff.firebaseapp.com",
+  databaseURL: "https://organization-app-2cdff-default-rtdb.firebaseio.com",
+  projectId: "organization-app-2cdff",
+  storageBucket: "organization-app-2cdff.firebasestorage.app",
+  messagingSenderId: "979198951578",
+  appId: "1:979198951578:web:e55e21353d4cb40f609f23"
+};
+
+const fbApp  = initializeApp(firebaseConfig);
+const auth   = getAuth(fbApp);
+const db     = getDatabase(fbApp);
+const provider = new GoogleAuthProvider();
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let currentUser = null;
+let currentRole = null;
+let allUsers    = {};
+let parts       = {};      // keyed by Firebase push key
+let editingId   = null;
+let adjId       = null;
+let adjQty      = 0;
+let activeFilter = 'all';
+let sortCol     = 'name';
+let sortDir     = 1;       // 1=asc, -1=desc
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+const escHtml = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function showScreen(screen) {
+  document.getElementById('loadingScreen').style.display  = screen==='loading' ?'flex':'none';
+  document.getElementById('loginScreen').style.display    = screen==='login'   ?'flex':'none';
+  document.getElementById('pendingScreen').style.display  = screen==='pending' ?'flex':'none';
+  document.getElementById('app').style.display            = screen==='app'     ?'block':'none';
+}
+
+function showToast(msg, err=false) {
+  document.querySelectorAll('.toast').forEach(t=>t.remove());
+  const t = document.createElement('div');
+  t.className = 'toast' + (err?' err':'');
+  t.textContent = '// ' + msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 2600);
+}
+
+function canEdit()   { return currentRole === 'admin'; }
+function canDelete() { return currentRole === 'admin'; }
+
+// ── AUTH ─────────────────────────────────────────────────────────────────────
+window.doGoogleSignIn = async () => {
+  try {
+    await signInWithPopup(auth, provider);
+  } catch(e) {
+    if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
+      await signInWithRedirect(auth, provider);
+    } else {
+      const el = document.getElementById('loginError');
+      el.style.display = 'block';
+      el.textContent = '// ERROR: ' + e.message;
+    }
+  }
+};
+window.doSignOut = () => fbSignOut(auth);
+
+onAuthStateChanged(auth, user => {
+  if (!user) { currentUser=null; currentRole=null; showScreen('login'); return; }
+  currentUser = user;
+
+  onValue(ref(db, `users/${user.uid}`), snap => {
+    if (!snap.exists()) {
+      set(ref(db, `users/${user.uid}`), {
+        name: user.displayName||'',
+        email: user.email||'',
+        role: 'pending',
+        joinedAt: Date.now()
+      });
+      document.getElementById('pendingEmail').textContent = user.email;
+      showScreen('pending');
+      return;
+    }
+    const data = snap.val();
+    const role = data.role;
+    if (role === 'pending') {
+      document.getElementById('pendingEmail').textContent = user.email;
+      showScreen('pending');
+    } else {
+      if (currentRole !== role) {
+        currentRole = role;
+        setupAppUI(user, role);
+        listenToParts();
+        listenToUsers();
+        showScreen('app');
+      }
+    }
+  });
+});
+
+function setupAppUI(user, role) {
+  const initials = (user.displayName||user.email||'?').substring(0,2).toUpperCase();
+  document.getElementById('userInitials').textContent = initials;
+  document.getElementById('userName').textContent = (user.displayName||user.email||'').split(' ')[0];
+  const badge = document.getElementById('userRoleBadge');
+  badge.textContent = role.toUpperCase();
+  badge.className = 'user-role-badge role-' + role;
+  document.getElementById('adminPanelBtn').style.display = role==='admin'?'block':'none';
+  document.getElementById('addPartBtn').style.display    = role==='admin'?'block':'none';
+}
+
+// ── FIREBASE LISTENERS ────────────────────────────────────────────────────────
+function listenToParts() {
+  onValue(ref(db, 'parts'), snap => {
+    parts = snap.val() || {};
+    renderParts();
+  });
+}
+
+function listenToUsers() {
+  onValue(ref(db, 'users'), snap => {
+    allUsers = snap.val() || {};
+  });
+}
+
+// ── FILTER / SORT ─────────────────────────────────────────────────────────────
+window.setFilter = (cat) => {
+  activeFilter = cat;
+  document.querySelectorAll('.filter-chip').forEach(el => {
+    el.classList.toggle('active', el.dataset.cat === cat);
+  });
+  renderParts();
+};
+
+window.sortBy = (col) => {
+  if (sortCol === col) { sortDir = -sortDir; }
+  else { sortCol = col; sortDir = 1; }
+  // Update header classes
+  document.querySelectorAll('th').forEach(th => {
+    th.classList.remove('sort-asc','sort-desc');
+    if (th.textContent.trim().toLowerCase().startsWith(col.substring(0,4).toLowerCase())) {
+      th.classList.add(sortDir===1?'sort-asc':'sort-desc');
+    }
+  });
+  renderParts();
+};
+
+function getFiltered() {
+  const search = (document.getElementById('searchInput')?.value||'').toLowerCase();
+  return Object.entries(parts)
+    .map(([id, p]) => ({...p, _id: id}))
+    .filter(p => {
+      if (activeFilter !== 'all' && p.category !== activeFilter) return false;
+      if (search && !p.name?.toLowerCase().includes(search) &&
+          !(p.sku||'').toLowerCase().includes(search) &&
+          !(p.notes||'').toLowerCase().includes(search)) return false;
+      return true;
+    })
+    .sort((a,b) => {
+      let av = a[sortCol]||'', bv = b[sortCol]||'';
+      if (sortCol === 'quantity') { av = +av; bv = +bv; return (av-bv)*sortDir; }
+      return av.toString().localeCompare(bv.toString()) * sortDir;
+    });
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+window.renderParts = () => {
+  const list = getFiltered();
+  const tbody = document.getElementById('partsBody');
+
+  // stats
+  const allList = Object.values(parts);
+  document.getElementById('statTotal').textContent    = allList.length;
+  document.getElementById('statInStock').textContent  = allList.filter(p=>p.quantity>0).length;
+  document.getElementById('statOutStock').textContent = allList.filter(p=>!p.quantity||p.quantity<=0).length;
+  document.getElementById('statUnits').textContent    = allList.reduce((s,p)=>s+(+p.quantity||0),0);
+  document.getElementById('partsCount').textContent   = list.length + ' PART' + (list.length===1?'':'S');
+
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">// NO PARTS FOUND</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = list.map(p => {
+    const qty = p.quantity||0;
+    const qtyClass = qty > 0 ? 'qty-good' : 'qty-zero';
+    const catClass = 'cat-' + (p.category||'other');
+    const editBtn = canEdit()
+      ? `<button class="row-btn" onclick="openEditModal('${p._id}')">EDIT</button>` : '';
+    const delBtn = canDelete()
+      ? `<button class="row-btn del" onclick="doDeletePart('${p._id}')">DEL</button>` : '';
+    const adjBtn = `<button class="row-btn adj" onclick="openAdj('${p._id}')">ADJ QTY</button>`;
+
+    return `<tr>
+      <td>
+        <div class="part-name">${escHtml(p.name||'—')}</div>
+        ${p.notes?`<div class="part-sku">${escHtml(p.notes)}</div>`:''}
+      </td>
+      <td><span style="font-family:'Share Tech Mono',monospace;font-size:0.75rem;color:var(--text-muted)">${escHtml(p.sku||'—')}</span></td>
+      <td><span class="cat-tag ${catClass}">${(p.category||'other').toUpperCase()}</span></td>
+      <td><span class="qty-badge ${qtyClass}">${qty}</span></td>
+      <td><div class="row-actions">${adjBtn}${editBtn}${delBtn}</div></td>
+    </tr>`;
+  }).join('');
+};
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+window.openModal = () => {
+  if (!canEdit()) return;
+  editingId = null;
+  document.getElementById('modalTitleText').textContent = 'NEW PART';
+  document.getElementById('f-name').value     = '';
+  document.getElementById('f-sku').value      = '';
+  document.getElementById('f-qty').value      = '';
+  document.getElementById('f-category').value = 'other';
+  document.getElementById('f-notes').value    = '';
+  document.getElementById('modalOverlay').classList.add('open');
+  setTimeout(()=>document.getElementById('f-name').focus(),100);
+};
+
+window.openEditModal = (id) => {
+  if (!canEdit()) return;
+  const p = parts[id]; if (!p) return;
+  editingId = id;
+  document.getElementById('modalTitleText').textContent = 'EDIT PART';
+  document.getElementById('f-name').value     = p.name||'';
+  document.getElementById('f-sku').value      = p.sku||'';
+  document.getElementById('f-qty').value      = p.quantity!=null?p.quantity:'';
+  document.getElementById('f-category').value = p.category||'other';
+  document.getElementById('f-notes').value    = p.notes||'';
+  document.getElementById('modalOverlay').classList.add('open');
+  setTimeout(()=>document.getElementById('f-name').focus(),100);
+};
+
+window.savePart = async () => {
+  const name = document.getElementById('f-name').value.trim();
+  const qty  = document.getElementById('f-qty').value;
+  if (!name) { document.getElementById('f-name').focus(); showToast('PART NAME REQUIRED', true); return; }
+  if (qty === '' || isNaN(+qty) || +qty < 0) { document.getElementById('f-qty').focus(); showToast('VALID QUANTITY REQUIRED', true); return; }
+
+  const payload = {
+    name,
+    sku:      document.getElementById('f-sku').value.trim(),
+    quantity: parseInt(qty,10),
+    category: document.getElementById('f-category').value,
+    notes:    document.getElementById('f-notes').value.trim(),
+    updatedAt: Date.now(),
+    updatedBy: currentUser.uid
+    // NOTE: taskIds is intentionally excluded here — update() is a merge,
+    // so the existing taskIds array in Firebase is preserved untouched.
+  };
+
+  try {
+    if (editingId) {
+      await update(ref(db, `parts/${editingId}`), payload);
+      showToast('PART UPDATED');
+    } else {
+      payload.createdAt = Date.now();
+      payload.createdBy = currentUser.uid;
+      // taskIds: empty array reserved for future part↔task linking
+      payload.taskIds = [];
+      // push new entry
+      const newRef = ref(db, 'parts');
+      const { push } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+      await push(newRef, payload);
+      showToast('PART ADDED');
+    }
+    closeModal();
+  } catch(e) {
+    showToast('ERROR: ' + e.message, true);
+  }
+};
+
+window.doDeletePart = async (id) => {
+  if (!canDelete()) return;
+  if (!confirm('Delete this part?')) return;
+  try {
+    await remove(ref(db, `parts/${id}`));
+    showToast('PART DELETED');
+  } catch(e) {
+    showToast('ERROR: ' + e.message, true);
+  }
+};
+
+window.closeModal = () => document.getElementById('modalOverlay').classList.remove('open');
+window.closeModalOutside = e => { if (e.target===document.getElementById('modalOverlay')) closeModal(); };
+
+// ── ADJUST QTY ────────────────────────────────────────────────────────────────
+window.openAdj = (id) => {
+  adjId  = id;
+  const p = parts[id]; if (!p) return;
+  adjQty = p.quantity || 0;
+  document.getElementById('adjPartName').textContent = (p.name||'').toUpperCase();
+  document.getElementById('adjDisplay').textContent  = adjQty;
+  document.getElementById('adjInput').value          = adjQty;
+  document.getElementById('adjOverlay').classList.add('open');
+};
+
+window.adjDelta = (d) => {
+  adjQty = Math.max(0, adjQty + d);
+  document.getElementById('adjDisplay').textContent = adjQty;
+  document.getElementById('adjInput').value         = adjQty;
+};
+
+window.adjFromInput = () => {
+  const v = parseInt(document.getElementById('adjInput').value, 10);
+  adjQty = isNaN(v)||v<0 ? 0 : v;
+  document.getElementById('adjDisplay').textContent = adjQty;
+};
+
+window.saveAdj = async () => {
+  if (!adjId) return;
+  try {
+    await update(ref(db, `parts/${adjId}`), { quantity: adjQty, updatedAt: Date.now(), updatedBy: currentUser.uid });
+    showToast('QTY UPDATED → ' + adjQty);
+    closeAdj();
+  } catch(e) {
+    showToast('ERROR: ' + e.message, true);
+  }
+};
+
+window.closeAdj = () => document.getElementById('adjOverlay').classList.remove('open');
+window.closeAdjOutside = e => { if (e.target===document.getElementById('adjOverlay')) closeAdj(); };
+
+// ── ADMIN ─────────────────────────────────────────────────────────────────────
+window.openAdminPanel = () => { renderAdminPanel(); document.getElementById('adminOverlay').classList.add('open'); };
+window.closeAdminPanel = () => document.getElementById('adminOverlay').classList.remove('open');
+window.closeAdminOutside = e => { if (e.target===document.getElementById('adminOverlay')) closeAdminPanel(); };
+
+function renderAdminPanel() {
+  const entries  = Object.entries(allUsers);
+  const pending  = entries.filter(([,u])=>u.role==='pending');
+  const approved = entries.filter(([,u])=>u.role!=='pending');
+
+  document.getElementById('pendingList').innerHTML = pending.length===0
+    ? '<div style="font-family:\'Share Tech Mono\',monospace;font-size:0.7rem;color:var(--text-muted);padding:8px 0">// NO PENDING USERS</div>'
+    : pending.map(([uid,u])=>`
+        <div class="user-row">
+          <div class="user-row-info">
+            <div class="user-row-name">${escHtml(u.name||'Unknown')}</div>
+            <div class="user-row-email">${escHtml(u.email)}</div>
+          </div>
+          <div class="user-row-actions">
+            <button class="approve-btn" onclick="approveUser('${uid}','member')">APPROVE MEMBER</button>
+            <button class="approve-btn admin-approve" onclick="approveUser('${uid}','admin')">AS ADMIN</button>
+          </div>
+        </div>`).join('');
+
+  document.getElementById('approvedList').innerHTML = approved.length===0
+    ? '<div style="font-family:\'Share Tech Mono\',monospace;font-size:0.7rem;color:var(--text-muted);padding:8px 0">// NO APPROVED USERS YET</div>'
+    : approved.map(([uid,u])=>`
+        <div class="user-row">
+          <div class="user-row-info">
+            <div class="user-row-name">${escHtml(u.name||'Unknown')} ${uid===currentUser.uid?'<span style="font-size:0.6rem;color:var(--text-muted)">(YOU)</span>':''}</div>
+            <div class="user-row-email">${escHtml(u.email)}</div>
+          </div>
+          <div class="user-row-actions">
+            <select class="role-select" onchange="changeRole('${uid}',this.value)" ${uid===currentUser.uid?'disabled':''}>
+              <option value="member" ${u.role==='member'?'selected':''}>MEMBER</option>
+              <option value="admin"  ${u.role==='admin' ?'selected':''}>ADMIN</option>
+            </select>
+            ${uid!==currentUser.uid?`<button class="remove-user-btn" onclick="removeUser('${uid}')">REMOVE</button>`:''}
+          </div>
+        </div>`).join('');
+}
+
+window.approveUser = async (uid, role) => {
+  await update(ref(db, `users/${uid}`), { role });
+  showToast('APPROVED AS ' + role.toUpperCase());
+  renderAdminPanel();
+};
+
+window.changeRole = async (uid, role) => {
+  await update(ref(db, `users/${uid}`), { role });
+  showToast('ROLE UPDATED');
+  renderAdminPanel();
+};
+
+window.removeUser = async (uid) => {
+  if (!confirm('Remove this user?')) return;
+  await remove(ref(db, `users/${uid}`));
+  showToast('USER REMOVED');
+  renderAdminPanel();
+};
+
+// ── KEYBOARD ──────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeModal(); closeAdj(); closeAdminPanel(); }
+  if ((e.ctrlKey||e.metaKey) && e.key==='k') { e.preventDefault(); openModal(); }
+});
+
+</script>
+</body>
+</html>
